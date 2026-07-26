@@ -1,0 +1,40 @@
+[
+  {
+    "emp_no": "20230101",
+    "password": "1234",
+    "name": "김직원",
+    "role": "employee",
+    "department": "영업1팀",
+    "hire_date": "2023-03-02",
+    "annual_leave_total": 16,
+    "annual_leave_used": 7.5,
+    "welfare_history": [
+      {"date": "2025-05-10", "type": "본인 결혼", "amount": 1000000},
+      {"date": "2026-02-14", "type": "자녀 출산(첫째)", "amount": 500000}
+    ]
+  },
+  {
+    "emp_no": "20180501",
+    "password": "1234",
+    "name": "이사원",
+    "role": "employee",
+    "department": "개발2팀",
+    "hire_date": "2018-05-01",
+    "annual_leave_total": 18,
+    "annual_leave_used": 12,
+    "welfare_history": []
+  },
+  {
+    "emp_no": "20100301",
+    "password": "admin",
+    "name": "박담당",
+    "role": "admin",
+    "department": "인사팀",
+    "hire_date": "2010-03-01",
+    "annual_leave_total": 23,
+    "annual_leave_used": 4,
+    "welfare_history": [
+      {"date": "2024-11-20", "type": "부모 사망", "amount": 1000000}
+    ]
+  }
+]
