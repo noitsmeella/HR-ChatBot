@@ -11,11 +11,18 @@ import json
 import os
 import re
 
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+QA_PATH = os.path.join(DATA_DIR, "qa_data.json")
+
+# 유사도 기준치: 이 값 미만이면 "답변 없음" 처리 → 담당자 전달
+THRESHOLD_EMBEDDING = 0.55   # sentence-transformers 코사인 유사도 기준
+THRESHOLD_TFIDF = 0.4        # TF-IDF는 임베딩보다 점수 분포가 낮음
+
 # 매칭에 정보가 없는 질문 관용구 — TF-IDF 오매칭 방지용으로 제거
 _BOILERPLATE = [
     "어떻게 하나요", "어떻게 되나요", "어떻게 해요", "어떻게 하는지",
     "알려주세요", "알려줘", "궁금해요", "궁금합니다", "있나요", "인가요",
-    "인가요", "일까요", "될까요", "되나요", "하나요", "해요", "예요", "에요",
+    "일까요", "될까요", "되나요", "하나요", "해요", "예요", "에요",
 ]
 
 
@@ -24,13 +31,6 @@ def normalize(text: str) -> str:
     for p in _BOILERPLATE:
         text = text.replace(p, " ")
     return re.sub(r"\s+", " ", text).strip()
-
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-QA_PATH = os.path.join(DATA_DIR, "qa_data.json")
-
-# 유사도 기준치: 이 값 미만이면 "답변 없음" 처리 → 담당자 전달
-THRESHOLD_EMBEDDING = 0.55   # sentence-transformers 코사인 유사도 기준
-THRESHOLD_TFIDF = 0.4        # TF-IDF는 임베딩보다 점수 분포가 낮음
 
 
 class QAMatcher:
@@ -70,7 +70,6 @@ class QAMatcher:
         category를 주면 해당 카테고리 문항만 검색 (카테고리 진입 후 질문하는 UX와 일치)
         """
         if self.backend == "embedding":
-            import numpy as np
             q_emb = self.model.encode([query], normalize_embeddings=True)
             scores = (self.corpus_emb @ q_emb.T).ravel()
             threshold = THRESHOLD_EMBEDDING
@@ -102,10 +101,13 @@ class QAMatcher:
 
 
 def format_answer(item: dict) -> str:
-    """답변 + 근거(사내규정/현행법규 매핑)를 함께 표시"""
+    """답변 + 근거(사내규정/현행법규 매핑)를 함께 표시. L3은 회사 자체 제도임을 명시"""
     lines = [item["answer"], ""]
     lines.append(f"📘 사내규정: {item['internal_policy']['doc']}")
-    lines.append(f"⚖️ 관련법규: {item['law']['doc']}")
+    if item.get("relation") == "L3":
+        lines.append("⚖️ 관련법규: 법정 제도가 아닌 회사 자체 제도입니다.")
+    else:
+        lines.append(f"⚖️ 관련법규: {item['law']['doc']}")
     return "\n".join(lines)
 
 
