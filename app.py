@@ -195,13 +195,100 @@ def employee_page(emp: dict):
         st.info("문장형 질문은 위에서 문의 카테고리를 먼저 선택해 주세요.")
 
 
+# ---------- 대시보드 ----------
+def dashboard_tab():
+    import pandas as pd
+    from report import get_frames, monthly_report, weekly_report
+
+    emps, loa, lv = get_frames()
+    today = date.today()
+    this_month = today.strftime("%Y-%m")
+
+    # 최신 법령 트래킹
+    st.subheader("⚖️ 최신 법령 트래킹")
+    law_data = load_json_obj(os.path.join(DATA_DIR, "law_updates.json"))
+    st.caption(f"최근 점검일: {law_data.get('last_checked', '-')} | "
+               f"추적 법령: {len(law_data.get('tracked_laws', []))}건 "
+               "(law_tracker.py가 매일 자동 갱신)")
+    for u in law_data.get("updates", []):
+        icon = "🔴" if u["status"] == "검토 필요" else "🟢"
+        with st.expander(f"{icon} {u['law']} {u['article']} — {u['status']}"):
+            st.write(f"변경 내용: {u['change']}")
+            st.write(f"시행일: {u['effective_date']}")
+            if u["affected_policies"]:
+                st.write(f"영향받는 사내규정: {', '.join(u['affected_policies'])}")
+                st.write(f"조치 필요: {u['action_needed']}")
+
+    # 이달의 연차/휴가 신청자
+    st.subheader(f"📅 이달의 연차/휴가 신청 ({this_month})")
+    lv_month = lv[lv["applied"].str.startswith(this_month)]
+    if len(lv_month):
+        st.dataframe(
+            lv_month[["이름", "부서", "type", "start", "end", "days", "status"]].rename(
+                columns={"type": "종류", "start": "시작일", "end": "종료일",
+                         "days": "일수", "status": "결재상태"}),
+            use_container_width=True, hide_index=True)
+    else:
+        st.info("이번 달 신청 내역이 없습니다.")
+
+    # 휴직 현황
+    st.subheader("🏥 휴직 현황")
+    loa_view = loa.copy()
+    loa_view["구분"] = loa_view.apply(
+        lambda r: "휴직 중" if r["start"] <= str(today) <= r["end"] and r["status"] == "승인"
+        else ("복직 완료" if r["end"] < str(today)
+              else ("휴직 예정" if r["status"] == "승인" else r["status"])), axis=1)
+    st.dataframe(
+        loa_view[["이름", "부서", "성별", "loa_type", "start", "end", "구분"]].rename(
+            columns={"loa_type": "휴직 종류", "start": "시작일", "end": "종료일"}),
+        use_container_width=True, hide_index=True)
+
+    # 통계
+    st.subheader(f"📊 {today.year}년 휴직 통계")
+    loa_year = loa[(loa["status"] == "승인") &
+                   (loa["start"] <= f"{today.year}-12-31") &
+                   (loa["end"] >= f"{today.year}-01-01")]
+    n_loa = loa_year["emp_no"].nunique()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("전체 재직 인원", f"{len(emps)}명")
+    c2.metric("올해 휴직자", f"{n_loa}명")
+    c3.metric("휴직자 비율", f"{n_loa / len(emps) * 100:.1f}%")
+    if len(loa_year):
+        cross = loa_year.groupby(["성별", "loa_type"]).size().unstack(fill_value=0)
+        st.caption("성별 × 휴직 종류 (건수)")
+        st.bar_chart(cross)
+
+    # 리포트 다운로드 (수작업 대체)
+    st.subheader("📄 리포트 생성")
+    st.caption("매주 금요일/매월 1일 자동 생성됩니다(report.py + 스케줄러). 수동 생성:")
+    c1, c2 = st.columns(2)
+    if c1.button("주간 리포트 생성 (휴직/휴가 현황)", use_container_width=True):
+        path = weekly_report()
+        with open(path, "rb") as f:
+            st.download_button("⬇️ " + os.path.basename(path), f, file_name=os.path.basename(path))
+    if c2.button("월간 통계 리포트 생성", use_container_width=True):
+        path = monthly_report()
+        with open(path, "rb") as f:
+            st.download_button("⬇️ " + os.path.basename(path), f, file_name=os.path.basename(path))
+
+
+def load_json_obj(path: str):
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
 # ---------- 담당자 화면 ----------
 def admin_page(emp: dict):
     matcher = get_matcher()
     st.title("🛠 HR 챗봇 관리자")
     st.caption(f"인사팀 {emp['name']}님")
 
-    tab1, tab2, tab3 = st.tabs(["미답변 질문", "보안 로그", "Q&A 데이터 현황"])
+    tab0, tab1, tab2, tab3 = st.tabs(["대시보드", "미답변 질문", "보안 로그", "Q&A 데이터 현황"])
+
+    with tab0:
+        dashboard_tab()
 
     with tab1:
         logs = load_json(UNANSWERED_PATH)

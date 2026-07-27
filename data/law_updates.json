@@ -1,0 +1,44 @@
+{
+  "_comment": "가상 예시 데이터입니다. 실제 운영 시 law_tracker.py가 국가법령정보센터 Open API에서 자동 수집합니다.",
+  "last_checked": "2026-07-27",
+  "tracked_laws": [
+    "근로기준법",
+    "남녀고용평등과 일·가정 양립 지원에 관한 법률",
+    "근로자퇴직급여 보장법",
+    "최저임금법",
+    "고용보험법"
+  ],
+  "updates": [
+    {
+      "law": "남녀고용평등법 (예시)",
+      "article": "제19조(육아휴직)",
+      "change": "육아휴직 관련 개정 (가상 예시 항목)",
+      "effective_date": "2026-10-01",
+      "affected_policies": [
+        "취업규칙-36"
+      ],
+      "action_needed": "사내 육아휴직 규정 및 관련 Q&A(leave 카테고리) 개정 검토 필요",
+      "status": "검토 필요"
+    },
+    {
+      "law": "최저임금 고시 (예시)",
+      "article": "2027년 적용 최저임금",
+      "change": "차년도 최저임금 고시 (가상 예시 항목)",
+      "effective_date": "2027-01-01",
+      "affected_policies": [
+        "보수규정-4"
+      ],
+      "action_needed": "보수규정 및 급여 테이블 반영 여부 확인",
+      "status": "검토 필요"
+    },
+    {
+      "law": "근로기준법 (예시)",
+      "article": "제60조(연차 유급휴가)",
+      "change": "변경 없음 — 최근 점검일 기준 개정사항 없음",
+      "effective_date": "-",
+      "affected_policies": [],
+      "action_needed": "-",
+      "status": "이상 없음"
+    }
+  ]
+}

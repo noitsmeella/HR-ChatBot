@@ -1,40 +1,14 @@
 [
-  {
-    "emp_no": "20230101",
-    "password": "1234",
-    "name": "김직원",
-    "role": "employee",
-    "department": "영업1팀",
-    "hire_date": "2023-03-02",
-    "annual_leave_total": 16,
-    "annual_leave_used": 7.5,
-    "welfare_history": [
-      {"date": "2025-05-10", "type": "본인 결혼", "amount": 1000000},
-      {"date": "2026-02-14", "type": "자녀 출산(첫째)", "amount": 500000}
-    ]
-  },
-  {
-    "emp_no": "20180501",
-    "password": "1234",
-    "name": "이사원",
-    "role": "employee",
-    "department": "개발2팀",
-    "hire_date": "2018-05-01",
-    "annual_leave_total": 18,
-    "annual_leave_used": 12,
-    "welfare_history": []
-  },
-  {
-    "emp_no": "20100301",
-    "password": "admin",
-    "name": "박담당",
-    "role": "admin",
-    "department": "인사팀",
-    "hire_date": "2010-03-01",
-    "annual_leave_total": 23,
-    "annual_leave_used": 4,
-    "welfare_history": [
-      {"date": "2024-11-20", "type": "부모 사망", "amount": 1000000}
-    ]
-  }
+  {"emp_no": "20230101", "password": "1234", "name": "김직원", "gender": "여", "role": "employee", "department": "영업1팀", "hire_date": "2023-03-02", "annual_leave_total": 16, "annual_leave_used": 7.5,
+   "welfare_history": [{"date": "2025-05-10", "type": "본인 결혼", "amount": 1000000}, {"date": "2026-02-14", "type": "자녀 출산(첫째)", "amount": 500000}]},
+  {"emp_no": "20180501", "password": "1234", "name": "이사원", "gender": "남", "role": "employee", "department": "개발2팀", "hire_date": "2018-05-01", "annual_leave_total": 18, "annual_leave_used": 12, "welfare_history": []},
+  {"emp_no": "20100301", "password": "admin", "name": "박담당", "gender": "여", "role": "admin", "department": "인사팀", "hire_date": "2010-03-01", "annual_leave_total": 23, "annual_leave_used": 4,
+   "welfare_history": [{"date": "2024-11-20", "type": "부모 사망", "amount": 1000000}]},
+  {"emp_no": "20190302", "password": "1234", "name": "최과장", "gender": "남", "role": "employee", "department": "기획팀", "hire_date": "2019-03-02", "annual_leave_total": 17, "annual_leave_used": 9, "welfare_history": []},
+  {"emp_no": "20200415", "password": "1234", "name": "정대리", "gender": "여", "role": "employee", "department": "개발1팀", "hire_date": "2020-04-15", "annual_leave_total": 17, "annual_leave_used": 3, "welfare_history": [{"date": "2026-01-20", "type": "자녀 출산(첫째)", "amount": 500000}]},
+  {"emp_no": "20211101", "password": "1234", "name": "한주임", "gender": "남", "role": "employee", "department": "영업2팀", "hire_date": "2021-11-01", "annual_leave_total": 16, "annual_leave_used": 11, "welfare_history": [{"date": "2026-06-30", "type": "자녀 출산(둘째)", "amount": 1000000}]},
+  {"emp_no": "20170908", "password": "1234", "name": "오차장", "gender": "여", "role": "employee", "department": "재무팀", "hire_date": "2017-09-08", "annual_leave_total": 19, "annual_leave_used": 6, "welfare_history": []},
+  {"emp_no": "20220301", "password": "1234", "name": "유사원", "gender": "남", "role": "employee", "department": "총무팀", "hire_date": "2022-03-01", "annual_leave_total": 16, "annual_leave_used": 8, "welfare_history": []},
+  {"emp_no": "20240102", "password": "1234", "name": "신입", "gender": "여", "role": "employee", "department": "개발2팀", "hire_date": "2024-01-02", "annual_leave_total": 15, "annual_leave_used": 5, "welfare_history": []},
+  {"emp_no": "20150601", "password": "1234", "name": "강부장", "gender": "남", "role": "employee", "department": "영업1팀", "hire_date": "2015-06-01", "annual_leave_total": 20, "annual_leave_used": 14, "welfare_history": []}
 ]
