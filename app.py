@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-HR 챗봇 데모 앱 (Streamlit)
+HR 챗봇 데모 앱 (Streamlit) — v4.0
 실행: streamlit run app.py
 테스트 계정: 직원 20230101/1234, 담당자 20100301/admin
+
+[v4.0 변경] 문의 탐색 구조 개편:
+  중분류(6) → 소분류/제도명(35) → FAQ 질문 버튼(클릭형) + 기타문의(문장형)
 
 [보안 설계 — 타인 정보 조회 원천 차단]
 원칙 1 (구조적 차단): 개인정보는 챗봇 지식(qa_data.json)에 존재하지 않는다.
@@ -20,6 +23,7 @@ from datetime import date, datetime
 import streamlit as st
 
 from matcher import QAMatcher, format_answer
+from legal_updates_page import render_legal_updates_page
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 EMP_PATH = os.path.join(DATA_DIR, "employees.json")
@@ -136,63 +140,108 @@ def login_page():
 
 
 # ---------- 직원 화면 ----------
+# 탐색 구조 (v4.0): 중분류 → 소분류(제도명) → FAQ 질문 버튼(클릭형) + 기타문의(문장형)
 def employee_page(emp: dict):
     matcher = get_matcher()
     st.title("💬 HR 챗봇")
     st.caption(f"{emp['department']} {emp['name']}님, 무엇을 도와드릴까요?")
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "category" not in st.session_state:
-        st.session_state.category = None
+    ss = st.session_state
+    ss.setdefault("messages", [])
+    ss.setdefault("major", None)   # 선택된 중분류 id
+    ss.setdefault("sub", None)     # 선택된 소분류 id
 
-    # 1단계: 카테고리 버튼 (세션 사용자 본인 데이터만 조회 — 원칙 2)
+    # 바로 확인하기 (세션 사용자 본인 데이터만 조회 — 원칙 2)
     st.subheader("바로 확인하기")
     c1, c2 = st.columns(2)
     if c1.button("📅 내 연차 조회/계산", use_container_width=True):
-        st.session_state.messages.append(("bot", calc_annual_leave(emp)))
+        ss.messages.append(("bot", calc_annual_leave(emp)))
     if c2.button("💐 경조사비 내역 조회", use_container_width=True):
-        st.session_state.messages.append(("bot", welfare_balance(emp)))
+        ss.messages.append(("bot", welfare_balance(emp)))
 
-    # 2단계: 문의 카테고리 선택 → 선택해야 채팅 입력창 활성화
     st.subheader("문의하기")
-    cats = list(matcher.categories.values())
-    cols = st.columns(len(cats))
-    for col, cat in zip(cols, cats):
-        selected = st.session_state.category == cat["id"]
-        if col.button(("✅ " if selected else "") + cat["name"],
-                      key=f"cat_{cat['id']}", use_container_width=True):
-            st.session_state.category = cat["id"]
+
+    # --- 1단계: 중분류 선택 ---
+    if ss.major is None:
+        st.caption("문의할 분야를 선택하세요")
+        majors = matcher.taxonomy
+        cols = st.columns(3)
+        for i, m in enumerate(majors):
+            if cols[i % 3].button(f"{m['name']}\n({len(m['subs'])}건)",
+                                  key=f"major_{m['id']}", use_container_width=True):
+                ss.major = m["id"]
+                st.rerun()
+
+    # --- 2단계: 소분류(제도명) 선택 ---
+    elif ss.sub is None:
+        major = matcher.majors[ss.major]
+        top = st.columns([1, 4])
+        if top[0].button("← 뒤로", key="back_to_major"):
+            ss.major = None
             st.rerun()
+        top[1].markdown(f"**{major['name']}** — 제도를 선택하세요")
+        cols = st.columns(3)
+        for i, s in enumerate(major["subs"]):
+            if cols[i % 3].button(s["name"], key=f"sub_{s['id']}",
+                                  use_container_width=True):
+                ss.sub = s["id"]
+                st.rerun()
+
+    # --- 3단계: FAQ(클릭형) + 기타문의(문장형) ---
+    else:
+        major = matcher.majors[ss.major]
+        sub = matcher.subs[ss.sub]
+        top = st.columns([1, 4])
+        if top[0].button("← 뒤로", key="back_to_sub"):
+            ss.sub = None
+            st.rerun()
+        top[1].markdown(f"{major['name']} > **{sub['name']}**")
+
+        st.caption("자주 묻는 질문 (클릭)")
+        faqs = matcher.faq_items(ss.sub)
+        if not faqs:
+            st.info("등록된 FAQ가 없습니다. 아래에 질문을 직접 입력해 주세요.")
+        for item in faqs:
+            if st.button(f"❓ {item['question']}", key=f"faq_{item['id']}",
+                         use_container_width=True):
+                ss.messages.append(("user", item["question"]))
+                ss.messages.append(("bot", format_answer(item)))
+                st.rerun()
 
     # 대화 표시
-    for role, msg in st.session_state.messages:
+    for role, msg in ss.messages:
         with st.chat_message("assistant" if role == "bot" else "user"):
             st.markdown(msg)
 
-    # 채팅 입력: 카테고리 선택 후에만 노출
-    if st.session_state.category:
-        cat_name = matcher.categories[st.session_state.category]["name"]
-        query = st.chat_input(f"[{cat_name}] 질문을 입력하세요")
+    # 기타문의(문장형): 소분류 선택 후에만 노출
+    if ss.sub:
+        sub = matcher.subs[ss.sub]
+        query = st.chat_input(f"[{sub['name']}] 기타문의를 입력하세요")
         if query:
-            st.session_state.messages.append(("user", query))
+            ss.messages.append(("user", query))
             # 보안 필터 (원칙 3, 4): 매칭 전에 검사
             reason = taboo_check(query, emp)
             if reason:
                 log_security(query, emp["emp_no"], reason)
-                st.session_state.messages.append(("bot", BLOCKED_MSG))
+                ss.messages.append(("bot", BLOCKED_MSG))
             else:
-                result = matcher.match(query, category=st.session_state.category)
+                # 선택한 소분류 안에서 우선 검색 → 실패 시 전체 폴백
+                result, other = matcher.match_with_fallback(query, ss.sub)
                 if result["matched"]:
-                    st.session_state.messages.append(("bot", format_answer(result["item"])))
+                    answer = format_answer(result["item"])
+                    if other:
+                        answer = (f"💡 다른 분류(**{other['name']}**)에서 답변을 찾았습니다.\n\n"
+                                  + answer)
+                    ss.messages.append(("bot", answer))
                 else:
-                    save_unanswered(query, emp["emp_no"], cat_name)
-                    st.session_state.messages.append(
+                    cat_label = f"{matcher.majors[ss.major]['name']} > {sub['name']}"
+                    save_unanswered(query, emp["emp_no"], cat_label)
+                    ss.messages.append(
                         ("bot", "죄송합니다. 등록된 답변을 찾지 못했습니다.\n\n"
                                 "질문을 인사팀 담당자에게 전달했습니다. 답변이 등록되면 안내드리겠습니다."))
             st.rerun()
     else:
-        st.info("문장형 질문은 위에서 문의 카테고리를 먼저 선택해 주세요.")
+        st.info("문장형 질문(기타문의)은 분야와 제도를 먼저 선택해 주세요.")
 
 
 # ---------- 대시보드 ----------
@@ -285,10 +334,13 @@ def admin_page(emp: dict):
     st.title("🛠 HR 챗봇 관리자")
     st.caption(f"인사팀 {emp['name']}님")
 
-    tab0, tab1, tab2, tab3 = st.tabs(["대시보드", "미답변 질문", "보안 로그", "Q&A 데이터 현황"])
+    tab0, tab_law, tab1, tab2, tab3 = st.tabs(["대시보드", "법령 업데이트", "미답변 질문", "보안 로그", "Q&A 데이터 현황"])
 
     with tab0:
         dashboard_tab()
+
+    with tab_law:
+        render_legal_updates_page()
 
     with tab1:
         logs = load_json(UNANSWERED_PATH)
@@ -310,12 +362,18 @@ def admin_page(emp: dict):
                 f"  {log['time']} | 요청자 사번 {log['emp_no']} | 질문: {log['query']}")
 
     with tab3:
-        st.metric("등록된 Q&A 수", len(matcher.items))
-        st.metric("검색 대상 문장 수 (유사표현 포함)", len(matcher.corpus))
-        st.metric("매칭 백엔드", matcher.backend)
-        for cat in matcher.categories.values():
-            n = sum(1 for i in matcher.items if i["category"] == cat["id"])
-            st.write(f"- {cat['name']}: {n}건")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("등록된 FAQ 수", len(matcher.items))
+        c2.metric("검색 대상 문장 수 (유사표현 포함)", len(matcher.corpus))
+        c3.metric("매칭 백엔드", matcher.backend)
+        st.caption("분류 체계: 중분류 → 소분류(제도명) → FAQ")
+        for m in matcher.taxonomy:
+            n_major = sum(1 for i in matcher.items if i["major"] == m["id"])
+            with st.expander(f"■ {m['name']} — 소분류 {len(m['subs'])}개 / FAQ {n_major}건"):
+                for s in m["subs"]:
+                    n = sum(1 for i in matcher.items if i["sub"] == s["id"])
+                    flag = "" if n else " ⚠️ FAQ 없음"
+                    st.write(f"- {s['name']}: {n}건{flag}")
 
     if st.button("직원 화면으로 보기"):
         st.session_state.view_as_employee = True

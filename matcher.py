@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-유사도 매칭 엔진 (retrieval-only)
+유사도 매칭 엔진 (retrieval-only) — v4.0
+- 분류 체계: 중분류(major) → 소분류(sub) → FAQ(qa_items)
 - 사용자 질문을 벡터화하여 미리 작성된 Q&A와 유사도 비교
 - 답변을 생성하지 않고, 사람이 작성한 답변을 그대로 반환 → 환각/유출 위험 없음
 - 임베딩 백엔드:
@@ -16,7 +17,7 @@ QA_PATH = os.path.join(DATA_DIR, "qa_data.json")
 
 # 유사도 기준치: 이 값 미만이면 "답변 없음" 처리 → 담당자 전달
 THRESHOLD_EMBEDDING = 0.55   # sentence-transformers 코사인 유사도 기준
-THRESHOLD_TFIDF = 0.4        # TF-IDF는 임베딩보다 점수 분포가 낮음
+THRESHOLD_TFIDF = 0.5        # TF-IDF는 임베딩보다 점수 분포가 낮음 (v4.0: FAQ 증가로 0.4→0.5 상향)
 
 # 매칭에 정보가 없는 질문 관용구 — TF-IDF 오매칭 방지용으로 제거
 _BOILERPLATE = [
@@ -37,7 +38,13 @@ class QAMatcher:
     def __init__(self, qa_path: str = QA_PATH):
         with open(qa_path, encoding="utf-8") as f:
             data = json.load(f)
-        self.categories = {c["id"]: c for c in data["categories"]}
+
+        # 분류 체계: 중분류 → 소분류
+        self.taxonomy = data["taxonomy"]                       # 순서 보존 리스트
+        self.majors = {m["id"]: m for m in self.taxonomy}
+        self.subs = {s["id"]: {**s, "major": m["id"]}
+                     for m in self.taxonomy for s in m["subs"]}
+
         self.items = data["qa_items"]
 
         # (질문 텍스트, item 인덱스) — 대표 질문 + 유사 표현 전부를 검색 대상으로
@@ -64,26 +71,33 @@ class QAMatcher:
                 [normalize(q) for q in self.corpus])
             return "tfidf"
 
-    def match(self, query: str, category: str | None = None, top_k: int = 3):
-        """
-        Returns: {"matched": bool, "item": dict|None, "score": float, "candidates": [...]}
-        category를 주면 해당 카테고리 문항만 검색 (카테고리 진입 후 질문하는 UX와 일치)
-        """
+    def faq_items(self, sub: str) -> list[dict]:
+        """소분류의 FAQ 목록 (클릭형 버튼용)"""
+        return [i for i in self.items if i["sub"] == sub]
+
+    def _scores(self, query: str):
         if self.backend == "embedding":
             q_emb = self.model.encode([query], normalize_embeddings=True)
-            scores = (self.corpus_emb @ q_emb.T).ravel()
-            threshold = THRESHOLD_EMBEDDING
-        else:
-            from sklearn.metrics.pairwise import cosine_similarity
-            q_vec = self.vectorizer.transform([normalize(query)])
-            scores = cosine_similarity(self.corpus_vec, q_vec).ravel()
-            threshold = THRESHOLD_TFIDF
+            return (self.corpus_emb @ q_emb.T).ravel(), THRESHOLD_EMBEDDING
+        from sklearn.metrics.pairwise import cosine_similarity
+        q_vec = self.vectorizer.transform([normalize(query)])
+        return cosine_similarity(self.corpus_vec, q_vec).ravel(), THRESHOLD_TFIDF
+
+    def match(self, query: str, major: str | None = None,
+              sub: str | None = None, top_k: int = 3):
+        """
+        Returns: {"matched": bool, "item": dict|None, "score": float, "candidates": [...]}
+        sub을 주면 해당 소분류만, major만 주면 해당 중분류 전체에서 검색.
+        """
+        scores, threshold = self._scores(query)
 
         # 문항(item) 단위 최고 점수로 집계
         best_per_item: dict[int, float] = {}
         for idx, score in zip(self.corpus_item_idx, scores):
             item = self.items[idx]
-            if category and item["category"] != category:
+            if sub and item["sub"] != sub:
+                continue
+            if major and item["major"] != major:
                 continue
             best_per_item[idx] = max(best_per_item.get(idx, 0.0), float(score))
 
@@ -99,6 +113,21 @@ class QAMatcher:
                 "score": round(ranked[0][1], 3) if ranked else 0.0,
                 "candidates": candidates}
 
+    def match_with_fallback(self, query: str, sub: str):
+        """
+        기타문의(문장형)용 2단계 매칭:
+        1) 선택한 소분류 안에서 검색
+        2) 실패 시 전체에서 검색 — 다른 소분류에서 찾으면 출처를 함께 반환
+        Returns: (result, found_in_other_sub: dict|None)
+        """
+        result = self.match(query, sub=sub)
+        if result["matched"]:
+            return result, None
+        g = self.match(query)
+        if g["matched"] and g["item"]["sub"] != sub:
+            return g, self.subs[g["item"]["sub"]]
+        return result, None
+
 
 def format_answer(item: dict) -> str:
     """답변 + 근거(사내규정/현행법규 매핑)를 함께 표시. L3은 회사 자체 제도임을 명시"""
@@ -107,23 +136,30 @@ def format_answer(item: dict) -> str:
     if item.get("relation") == "L3":
         lines.append("⚖️ 관련법규: 법정 제도가 아닌 회사 자체 제도입니다.")
     else:
-        lines.append(f"⚖️ 관련법규: {item['law']['doc']}")
+        lines.append(f"⚖️ 관련법규: {item.get('law', {}).get('doc', '매핑 예정')}")
     return "\n".join(lines)
 
 
 if __name__ == "__main__":
     matcher = QAMatcher()
     print(f"[백엔드: {matcher.backend}]")
+    print(f"중분류 {len(matcher.majors)} / 소분류 {len(matcher.subs)} / FAQ {len(matcher.items)}")
+
     tests = [
-        "연차 몇 개 생겨요?",
-        "부모님이 돌아가셨는데 회사에서 지원되는 게 있나요?",
-        "야근하면 수당 얼마나 받아요?",
-        "주차장 등록은 어떻게 하나요?",   # 데이터에 없는 질문 → 미매칭이어야 정상
+        ("연차휴가 알려줘", None, "statutory-annual"),
+        ("육아휴직 신청하고 싶어요", None, "statutory-childcare"),
+        ("정년퇴직 문의", "hire", None),
+        ("주차장 등록은 어떻게 하나요?", None, None),  # 데이터에 없음 → 미매칭이어야 정상
     ]
-    for q in tests:
-        r = matcher.match(q)
-        print(f"\nQ: {q}")
+    for q, major, sub in tests:
+        r = matcher.match(q, major=major, sub=sub)
+        print(f"\nQ: {q}  (범위: major={major}, sub={sub})")
         if r["matched"]:
             print(f"  → [{r['score']}] {r['item']['id']}: {r['item']['question']}")
         else:
             print(f"  → 미매칭 (최고점수 {r['score']}) → 담당자 전달")
+
+    # 폴백 테스트: 소분류를 잘못 골라도 전체에서 찾아줌
+    r, other = matcher.match_with_fallback("연차휴가 알려줘", "work-overtime")
+    print(f"\n[폴백] 초과근무에서 연차 질문 → matched={r['matched']}, "
+          f"다른 소분류={other['name'] if other else None}")
