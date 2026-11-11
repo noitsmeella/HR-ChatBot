@@ -1,3 +1,5 @@
+**한국어** | [English](README.en.md)
+
 # HR 챗봇 프로토타입
 
 사내 인사 제도 문의에 답하는 **검색 전용(retrieval-only) HR 챗봇**입니다.
