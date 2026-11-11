@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node (make_codebook.js 의존성)
+node_modules/
+
+# 실행 중 자동 생성되는 로그·리포트
+data/unanswered.json
+data/security_log.json
+reports/
+
+# 사내 실데이터 (v5.0 이후) — 절대 커밋 금지
+data/policies/
+
+# 작업 흔적
+*.tmp
+.~lock*
+.DS_Store
+check/
+page-*.jpg
+.claude/
+
+# 환경 변수·비밀 정보
+.env
