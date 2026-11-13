@@ -3,7 +3,7 @@
 qa_data.json 생성 스크립트 (v4.0)
 - 분류 체계: 중분류(major) → 소분류(sub, 제도명) → FAQ(qa_items)
 - 공개 저장소용: FAQ는 소분류마다 내용 없는 예시 항목 1건만 생성한다.
-  (실제 FAQ 질문·답변과 근거 규정은 사내 데이터라 포함하지 않음)
+  (시연 버전의 FAQ 질문·답변과 근거 규정은 포함하지 않음)
 - 실제 FAQ를 넣으려면 아래 build_placeholder_items() 대신 qa_items를 직접 채우면 된다.
 """
 import json
@@ -12,7 +12,7 @@ import os
 OUT = os.path.join(os.path.dirname(__file__), "data", "qa_data.json")
 
 # ---------------- 분류 체계 (중분류 → 소분류) ----------------
-# 공개 저장소용: 법령 근거가 있는 법정 제도만 포함 (회사 자체 제도는 제외)
+# 공개 저장소용: 시연 버전 분류 구조의 일부만 포함
 TAXONOMY = [
     ("work", "근무제도", [
         ("overtime", "초과근무"), ("night", "야간휴일근무"),
